@@ -594,7 +594,7 @@ class ServiceManagementEndpoint(object):
         # Status must be 'Failed', get additional error info
         error = ET.find('.//{%s}Error' % NAMESPACE_MANAGEMENT)
         if error is not None:
-            result['Error'] = WASMError(*self._get_wa_error(ET))
+            result['Error'] = WASMError(*self._get_wa_error(res, ET))
         return result
 
     def request_done(self, request_id):
