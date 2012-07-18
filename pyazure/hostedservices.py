@@ -81,6 +81,7 @@ class HostedServices(ServiceManagementEndpoint):
             self.delete_deployment,
             self.update_deployment_status,
             self.change_deployment_configuration,
+            self.upgrade_deployment,
         ]
 
     def list_services(self, just_names=True):
