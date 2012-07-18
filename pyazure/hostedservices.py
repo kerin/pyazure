@@ -81,6 +81,7 @@ class HostedServices(ServiceManagementEndpoint):
             self.delete_deployment,
             self.update_deployment_status,
             self.change_deployment_configuration,
+            self.swap_deployment,
         ]
 
     def list_services(self, just_names=True):
@@ -339,8 +340,25 @@ class HostedServices(ServiceManagementEndpoint):
             % NAMESPACE_MANAGEMENT)
         return info
 
-    def swap_deployment(self):
-        pass
+    def swap_deployment(self, service_name, production_deployment_name,
+            source_deployment_name):
+        log.debug('Swapping %s deployments "%s" and "%s"', service_name,
+            production_deployment_name, source_deployment_name)
+        req = RequestWithMethod('POST', '%s/%s' % (self.base_url,service_name))
+        req_body = OrderedDict()
+        req_body['Production'] = production_deployment_name
+        req_body['SourceDeployment'] = source_deployment_name
+
+        req_body = OrderedDict([('Swap', req_body)])
+        req.add_data(build_wasm_request_body(req_body))
+        res = self.urlopen(req)
+        log.debug('HTTP Response: %s %s', res.code, res.msg)
+        if res.code != httplib.ACCEPTED:
+            self._raise_wa_error(res)
+        request_id = res.headers.getheader('x-ms-request-id')
+        log.debug('Request-Id: %s', request_id)
+        return request_id
+
 
     def delete_deployment(self, service_name, deployment_slot_or_name):
         """The Delete Deployment (async-)operation deletes the specified
