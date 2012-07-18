@@ -442,8 +442,47 @@ class HostedServices(ServiceManagementEndpoint):
         log.debug('Request-Id: %s', request_id)
         return request_id
 
-    def upgrade_deployment(self):
-        pass
+    def upgrade_deployment(self, service_name, deployment_slot,
+            package_url, label, configuration, mode=u'auto',
+            role_to_upgrade=None, force=False):
+        """The Upgrade Deployment (async-)operation initiates an upgrade."""
+
+        if deployment_slot.lower() not in ('staging','production'):
+            raise ValueError(deployment_slot,'deployment_slot must be '
+                + '"staging" or "production"')
+        if len(label) > 100:
+            raise ValueError(label,'label exceeds 100 char limit')
+        if isinstance(configuration, basestring):
+            if os.path.isfile(configuration):
+                config = open(configuration).read()
+            else:
+                config = configuration
+        elif isinstance(configuration, file):
+            config = configuration.read()
+        else:
+            config = configuration
+
+        url = '%s/%s/deploymentslots/%s/?comp=upgrade' % (self.base_url,
+                                                          service_name,
+                                                          deployment_slot)
+        req = RequestWithMethod('POST', url)
+        req_body = OrderedDict()
+        req_body['Mode'] = mode
+        req_body['PackageUrl'] = package_url
+        req_body['Configuration'] = base64.b64encode(`config`)
+        req_body['Label'] = base64.b64encode(label)
+        if role_to_upgrade:
+            req_body['RoleToUpgrade'] = role_to_upgrade
+        req_body['Force'] = unicode(force).lower()
+
+        req_body = OrderedDict([('UpgradeDeployment', req_body)])
+        req.add_data(build_wasm_request_body(req_body))
+        res = self.urlopen(req)
+        if res.code != httplib.ACCEPTED:
+            self._raise_wa_error(res)
+        request_id = res.headers.getheader('x-ms-request-id')
+        log.debug('Request-Id: %s' % request_id)
+        return request_id
 
     def walk_upgrade_domain(self):
         pass
