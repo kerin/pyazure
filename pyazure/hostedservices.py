@@ -11,10 +11,10 @@ Authors:
 
 License:
     GNU General Public Licence (GPL)
-    
+
     This file is part of pyazure.
     Copyright (c) 2011 Blair Bethwaite <blair.bethwaite@gmail.com>
-    
+
     pyazure is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation, either version 3 of the License, or
@@ -45,14 +45,14 @@ from locations import Locations
 
 
 class HostedServices(ServiceManagementEndpoint):
-    
+
     def __init__(self, *args, **kwargs):
         log.debug("init hosted service")
         self.wasm_ops = self.get_wasm_ops()
         self._locations = None
         self.last_response_data = None
         super(HostedServices, self).__init__(*args, **kwargs)
-    
+
     @property
     def base_url(self):
         return super(HostedServices, self).base_url \
@@ -83,6 +83,7 @@ class HostedServices(ServiceManagementEndpoint):
             self.change_deployment_configuration,
             self.upgrade_deployment,
             self.swap_deployment,
+            self.get_deployment_slot,
         ]
 
     def list_services(self, just_names=True):
@@ -166,7 +167,7 @@ class HostedServices(ServiceManagementEndpoint):
         which the service belongs, or its location if it is not part of an
         affinity group; and optionally, information on the service's
         deployments."""
-        
+
         log.debug('Getting hosted service info: %s', service_name)
         if embed_detail:
             req = RequestWithMethod('GET', '%s/%s?embed-detail=true'
@@ -225,7 +226,7 @@ class HostedServices(ServiceManagementEndpoint):
             config = configuration.read()
         else:
             config = configuration
-        
+
         req = RequestWithMethod('POST', '%s/%s/deploymentslots/%s'
             % (self.base_url, service_name, deployment_slot))
         req_body = OrderedDict()
@@ -245,13 +246,27 @@ class HostedServices(ServiceManagementEndpoint):
         request_id = res.headers.getheader('x-ms-request-id')
         log.debug('Request-Id: %s', request_id)
         return request_id
-    
+
     def get_deployment(self, service_name, name):
         """The Get Deployment operation returns configuration information,
         status, and system properties for a deployment."""
 
         log.debug('Getting deployment info: %s - %s', service_name, name)
         req = RequestWithMethod('GET', '%s/%s/deployments/%s'
+            % (self.base_url, service_name, name))
+        res = self.urlopen(req)
+        self.last_response_data = res.read()
+        res.fp = StringIO(self.last_response_data)
+        res.read = res.fp.read
+        log.debug('HTTP Response: %s %s', res.code, res.msg)
+        if res.code != httplib.OK:
+            self._raise_wa_error(res)
+        deployment = etree.parse(res)
+        return self._parse_deployment(deployment.getroot())
+
+    def get_deployment_slot(self, service_name, name):
+        log.debug('Getting deployment slot info: %s - %s', service_name, name)
+        req = RequestWithMethod('GET', '%s/%s/deploymentslots/%s'
             % (self.base_url, service_name, name))
         res = self.urlopen(req)
         self.last_response_data = res.read()
@@ -386,7 +401,7 @@ class HostedServices(ServiceManagementEndpoint):
             treat_warnings_as_error=False, mode='Auto'):
         """The Change Deployment Configuration (async-)operation initiates a
         change to the deployment configuration.
-        
+
         The Change Deployment Configuration operation is an asynchronous
         operation. To determine whether the Management service has finished
         processing the request, call Get Operation Status."""
@@ -412,7 +427,7 @@ class HostedServices(ServiceManagementEndpoint):
             req = RequestWithMethod('POST',
                 '%s/%s/deployments/%s/?comp=config' % (self.base_url,
                  service_name, deployment_slot_or_name))
-        req_body = OrderedDict()      
+        req_body = OrderedDict()
         req_body['Configuration'] = base64.b64encode(`config`)
         if treat_warnings_as_error:
             req_body['TreatWarningsAsError'] = u'true'
@@ -517,7 +532,7 @@ class HostedServices(ServiceManagementEndpoint):
 
 
 class ServiceConfiguration(object):
-    
+
     def __init__(self, cscfg):
         if isinstance(cscfg, basestring):
             if os.path.isfile(cscfg):
